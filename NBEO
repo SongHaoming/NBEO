@@ -1,0 +1,127 @@
+
+function [Fitness,Acc,sFeat,Sf,Nf,curve,best_score,dt] = jD4Z2NBEO(feat,label,N,max_Iter,a1,a2,GP,HO,Alpha,Beta)
+tic
+thres = 0.5; 
+Vmax=6;
+V     = 1;     % unit
+
+fun = @jFitnessFunction; 
+
+dim = size(feat,2); 
+
+X   = zeros(N,dim); 
+for i = 1:N
+    for d = 1:dim
+        if rand() > 0.5
+           X(i,d) = 1;
+        end
+    end
+end
+
+Xmb  = zeros(N,dim); 
+fitM = ones(1,N);
+
+fitE1 = inf;
+fitE2 = inf; 
+fitE3 = inf;
+fitE4 = inf; 
+Xeq1  = zeros(1,dim);
+Xeq2  = zeros(1,dim); 
+Xeq3  = zeros(1,dim);
+Xeq4  = zeros(1,dim);
+Xave  = zeros(1,dim);
+fit   = zeros(1,N); 
+
+curve = inf;
+t = 1;
+
+while t <= max_Iter
+  
+  for i = 1:N
+    fit(i) = fun(feat,label,X(i,:),HO);
+  
+    if fit(i) < fitE1
+      fitE1 = fit(i); 
+      Xeq1  = X(i,:);
+    elseif fit(i) > fitE1 && fit(i) < fitE2
+      fitE2 = fit(i);
+      Xeq2  = X(i,:);
+    elseif fit(i) > fitE1 && fit(i) > fitE2 && fit(i) < fitE3
+      fitE3 = fit(i);
+      Xeq3  = X(i,:);
+    elseif fit(i) > fitE1 && fit(i) > fitE2 && fit(i) > fitE3 &&fit(i) < fitE4
+      fitE4 = fit(i);
+      Xeq4  = X(i,:);
+    end
+  end
+
+  for i = 1:N
+    if fitM(i) < fit(i)
+      fit(i) = fitM(i);
+      X(i,:) = Xmb(i,:);
+    end
+  end
+
+  Xmb  = X; 
+  fitM = fit; 
+ 
+  for d = 1:dim
+    Xave(d) = (Xeq1(d) + Xeq2(d) + Xeq3(d) + Xeq4(d)) / 4;
+  end
+  
+  Xpool = [Xeq1; Xeq2; Xeq3; Xeq4; Xave];
+  
+  T     = (1 - (t / max_Iter)) ^ (a2 * (t / max_Iter));
+  for i = 1:N
+   
+    r1 = rand(); 
+    r2 = rand();
+    if r2 >= GP
+      GCP = 0.5 * r1;
+    else
+      GCP = 0;
+    end
+  
+    eq = randi([1,5]);
+    for d = 1:dim
+     
+         chValue=(t)^(1/6)/(max_Iter)^(1/6);%好用
+     x(1)=0.7;
+     x(t+1) = 2.3*x(t)^2*sin(pi*x(t));
+     G(t)=(x(t))*chValue;
+     Cs=G(t);
+     
+      r = rand();
+%       lambda = rand();
+      lambda = Cs;
+    
+      F  = a1 * sign(r - 0.5) * (exp(-lambda * T) - 1);
+      
+      G0 = GCP * (Xpool(eq,d) - lambda * X(i,d));
+     
+      G  = G0 * F;
+      Xc = Xpool(eq,d) + (X(i,d) - Xpool(eq,d)) * F + (G / (lambda * V)) * (1 - F);
+      Xc(Xc > Vmax) = Vmax;  Xc(Xc < -Vmax) = -Vmax; 
+      X(i,d) = rand*(max(Xc)+min(Xc)-(Xc)); 
+      TF     = 1 / (1 + exp(-2*((max(Xc)/(max(Xc)+min(Xc)))*X(i,d))));
+      if TF > rand()
+        X(i,d) = 1;
+      else
+        X(i,d) = 0;
+      end
+    end
+  end 
+  curve(t) = fitE1;
+  fprintf('\nIteration %d Best (BEO)= %f',t,curve(t))
+  t = t + 1;
+end
+best_score= fitE1;
+Pos   = 1:dim;
+Sf    = Pos((Xeq1 > thres) == 1);
+sFeat = feat(:,Sf);
+Nf    = length(Sf);
+Acc=1-best_score;
+Fitness=Alpha*best_score+Beta*(Nf/dim);
+dt = toc;
+end
+
